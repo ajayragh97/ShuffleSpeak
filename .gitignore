@@ -1,0 +1,6 @@
+.vscode/
+
+# PyInstaller build files
+build/
+dist/
+*.spec
