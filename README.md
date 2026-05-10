@@ -38,12 +38,12 @@ There are three ways to run this application depending on your technical comfort
 *Best for non-coders and end-users.*
 
 **For Windows:**
-1. Download `ShuffleSpeak.exe` from the [Releases](https://github.com/ajayragh97/ShuffleSpeak/releases/) page.
+1. Download `ShuffleSpeak.exe` from the [Releases](https://github.com/ajayragh97/ShuffleSpeak/releases/tag/v1.0.0-windows) page.
 2. Double-click the file to run. 
    *(Note: Windows Defender may show a "SmartScreen" warning because the app is unpublished. Click **More Info** -> **Run Anyway**).*
 
 **For Ubuntu / Linux:**
-1. Download the `shufflespeak_ubuntu` binary from the [Releases](https://github.com/ajayragh97/ShuffleSpeak/releases/) page.
+1. Download the `shufflespeak_ubuntu` binary from the [Releases](https://github.com/ajayragh97/ShuffleSpeak/releases/tag/v1.0.0-ubuntu/) page.
 2. Open your terminal and grant execution permissions: `chmod +x shufflespeak_ubuntu`
 3. Run the app: `./shufflespeak_ubuntu`
 
