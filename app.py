@@ -7,7 +7,6 @@ import glob
 import threading
 import wave
 import pyaudio
-import time
 from pathlib import Path
 
 class Database:
@@ -15,15 +14,13 @@ class Database:
         self.conn = sqlite3.connect(db_path)
         self.cursor = self.conn.cursor()
         
-        # Create table with new memo_time column
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS sessions 
                                (name TEXT PRIMARY KEY, words TEXT, memo_time REAL)''')
                                
-        # Seamlessly upgrade old databases that don't have memo_time yet
         try:
-            self.cursor.execute("ALTER TABLE sessions ADD COLUMN memo_time REAL DEFAULT 5.0")
+            self.cursor.execute("ALTER TABLE sessions ADD COLUMN memo_time REAL DEFAULT 1.0")
         except sqlite3.OperationalError:
-            pass # Column already exists, all good!
+            pass 
             
         self.conn.commit()
 
@@ -37,7 +34,7 @@ class Database:
         row = self.cursor.fetchone()
         if row:
             return row[0].split(','), float(row[1])
-        return[], 5.0
+        return[], 1.0
 
     def get_all_sessions(self):
         self.cursor.execute("SELECT name FROM sessions")
@@ -84,7 +81,7 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("ShuffleSpeak - Memory Training Recorder")
-        self.geometry("600x600") # Increased slightly to fit new fields
+        self.geometry("600x600") 
         
         self.workspace_dir = os.path.join(str(Path.home()), "Documents", "Voice Recorder Sessions")
         os.makedirs(self.workspace_dir, exist_ok=True)
@@ -95,9 +92,9 @@ class App(tk.Tk):
         self.current_session = None
         self.current_words =[]
         self.current_display_text = ""
-        self.current_memo_time = 5.0
+        self.current_memo_time = 1.0  # Now represents time PER word
         self.current_record_id = None
-        self.memo_end_time = 0
+        self.current_word_index = 0
         
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill="both", expand=True, padx=10, pady=10)
@@ -126,10 +123,10 @@ class App(tk.Tk):
         self.text_words = tk.Text(frame, height=4, width=50)
         self.text_words.pack(pady=5)
         
-        # --- NEW: Memorization Time Field ---
-        ttk.Label(frame, text="Memorization Time (Seconds, e.g., 4.5):").pack(pady=(5, 0))
+        # --- UPDATED: Time per word ---
+        ttk.Label(frame, text="Time per word (Seconds, e.g., 1.0):").pack(pady=(5, 0))
         self.entry_memo_time = ttk.Entry(frame, width=15, justify="center")
-        self.entry_memo_time.insert(0, "5.0")
+        self.entry_memo_time.insert(0, "1.0")
         self.entry_memo_time.pack(pady=5)
         
         ttk.Button(frame, text="Save Session", command=self.save_session).pack(pady=10)
@@ -190,7 +187,7 @@ class App(tk.Tk):
             if memo_time <= 0:
                 raise ValueError
         except ValueError:
-            messagebox.showwarning("Input Error", "Memorization time must be a positive decimal number (e.g., 2.5 or 5).")
+            messagebox.showwarning("Input Error", "Time per word must be a positive decimal number (e.g., 1.0).")
             return
             
         self.db.save_session(name, words, memo_time)
@@ -206,13 +203,16 @@ class App(tk.Tk):
         self.current_session = session
         self.current_words, self.current_memo_time = self.db.get_session_data(session)
         
+        # Clean up empty spaces in the word list immediately upon loading
+        self.current_words = [w.strip() for w in self.current_words if w.strip()]
+        
         session_path = os.path.join(self.workspace_dir, self.current_session)
         os.makedirs(os.path.join(session_path, "audio"), exist_ok=True)
         os.makedirs(os.path.join(session_path, "text"), exist_ok=True)
             
         self.notebook.tab(self.record_frame, state="normal")
         self.notebook.select(self.record_frame)
-        self.lbl_session_title.config(text=f"Session: {session}  (Time: {self.current_memo_time}s)")
+        self.lbl_session_title.config(text=f"Session: {session}  ({self.current_memo_time}s per word)")
         
         self.prepare_recording_view()
 
@@ -232,11 +232,11 @@ class App(tk.Tk):
         return f"record_{max_num + 1}"
 
     def prepare_recording_view(self):
-        # Generate the newly shuffled arrangement but keep it hidden
         random.shuffle(self.current_words)
-        self.current_display_text = " • ".join([w.strip() for w in self.current_words if w.strip()])
+        # Store the combined string for the final review phase
+        self.current_display_text = " • ".join(self.current_words)
         
-        self.lbl_words.config(text="[ Words Hidden - Press Start to Reveal ]", foreground="black")
+        self.lbl_words.config(text="[ Words Hidden - Press Start to Reveal ]", foreground="black", font=("Helvetica", 16, "bold"))
         self.lbl_status.config(text="Ready. Press Start to begin memorization.", foreground="gray")
         
         self.btn_record.config(state="normal")
@@ -247,26 +247,33 @@ class App(tk.Tk):
         self.btn_record.config(state="disabled")
         self.btn_shuffle.config(state="disabled")
         
-        # Reveal the words
-        self.lbl_words.config(text=self.current_display_text, foreground="blue")
-        
-        # Start smooth high-res timer
-        self.memo_end_time = time.time() + self.current_memo_time
-        self.update_countdown()
+        # Reset word index
+        self.current_word_index = 0
+        self.show_next_word()
 
-    def update_countdown(self):
-        remaining = self.memo_end_time - time.time()
-        
-        if remaining > 0:
-            self.lbl_status.config(text=f"Memorize! {remaining:.1f}s remaining...", foreground="orange")
-            # Loop this function every 100 milliseconds for smooth decimal updates
-            self.after(100, self.update_countdown)
+    def show_next_word(self):
+        if self.current_word_index < len(self.current_words):
+            word = self.current_words[self.current_word_index]
+            
+            # Show single word, scale up font to massive size for focus
+            self.lbl_words.config(text=word, foreground="blue", font=("Helvetica", 36, "bold"))
+            self.lbl_status.config(
+                text=f"Memorize! Word {self.current_word_index + 1} of {len(self.current_words)}", 
+                foreground="orange"
+            )
+            
+            self.current_word_index += 1
+            
+            # Wait for user's configured time (converted to milliseconds)
+            delay_ms = int(self.current_memo_time * 1000)
+            self.after(delay_ms, self.show_next_word)
         else:
+            # All words have been shown, start recording!
             self.start_recording()
 
     def start_recording(self):
-        # 1. Hide words
-        self.lbl_words.config(text="[ * * * HIDDEN * * * ]", foreground="black")
+        # 1. Hide words and reset font size
+        self.lbl_words.config(text="[ * * * HIDDEN * * * ]", foreground="black", font=("Helvetica", 16, "bold"))
         
         # 2. Get ID and save text file
         self.current_record_id = self._get_next_record_id()
@@ -284,8 +291,8 @@ class App(tk.Tk):
     def stop_recording(self):
         self.recorder.stop()
         
-        # Reveal the words again so the user can verify if they got it right
-        self.lbl_words.config(text=self.current_display_text, foreground="green")
+        # Reveal all words together in normal font so the user can verify their accuracy
+        self.lbl_words.config(text=self.current_display_text, foreground="green", font=("Helvetica", 16, "bold"))
         
         self.lbl_status.config(text=f"Saved {self.current_record_id} successfully! Check your accuracy above.", foreground="green")
         self.btn_stop.config(state="disabled")
