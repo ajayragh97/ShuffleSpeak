@@ -38,7 +38,7 @@ There are three ways to run this application depending on your technical comfort
 *Best for non-coders and end-users.*
 
 **For Windows:**
-1. Download `ShuffleSpeak.exe` from the [Releases](https://github.com/ajayragh97/ShuffleSpeak/releases/tag/v1.0.0-windows) page.
+1. Download `ShuffleSpeak.exe` from the [Releases](https://github.com/ajayragh97/ShuffleSpeak/releases/tag/v1.1.0-windows) page.
 2. Double-click the file to run. 
    *(Note: Windows Defender may show a "SmartScreen" warning because the app is unpublished. Click **More Info** -> **Run Anyway**).*
 
